@@ -1,0 +1,32 @@
+# AutoFoam-Lite — Python dependencies
+# Install with: pip install -r requirements.txt
+#
+# PyTorch: install separately with your CUDA version first:
+#   GPU (CUDA 12.4):
+#     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
+#   CPU-only:
+#     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+
+# LLM inference (4-bit NF4 on GPU)
+transformers==5.9.0
+bitsandbytes==0.49.2
+accelerate==1.13.0
+huggingface_hub
+
+# Meshing
+gmsh==4.15.2
+
+# Vector store (RAG)
+chromadb==1.5.9
+sentence-transformers==5.5.1
+
+# Web UI
+gradio==6.14.0
+
+# Schema / validation
+pydantic==2.13.4
+
+# Numerics / plotting
+numpy==2.4.4
+scipy==1.17.1
+matplotlib==3.10.9

@@ -1,0 +1,71 @@
+# AutoFOAM — GPU image
+# CUDA 12.4 + Ubuntu 22.04 → OpenFOAM 2412 → Python 3.11 → AutoFOAM
+FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/data/hf_cache \
+    USE_CPU_INFERENCE=0 \
+    TORCHDYNAMO_DISABLE=1 \
+    OPENFOAM_BASHRC=/usr/lib/openfoam/openfoam2412/etc/bashrc
+
+# ── System packages ───────────────────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl gnupg ca-certificates lsb-release \
+        python3.11 python3.11-dev python3-pip \
+        git wget \
+        libglu1-mesa libxrender1 libxcursor1 libxft2 libxinerama1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── OpenFOAM 2412 (openfoam.com ESI) ─────────────────────────────────────────
+RUN curl -fsSL https://dl.openfoam.com/add-debian-repo.sh | bash \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends openfoam2412 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Python packages ───────────────────────────────────────────────────────────
+RUN python3.11 -m pip install --upgrade pip setuptools wheel
+
+# PyTorch with CUDA 12.4 (pinned to tested versions)
+RUN pip install \
+    torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# ML inference stack (4-bit NF4 via bitsandbytes)
+RUN pip install \
+    transformers==5.9.0 \
+    bitsandbytes==0.49.2 \
+    accelerate==1.13.0 \
+    huggingface_hub
+
+# AutoFOAM runtime dependencies (pinned to known-working versions)
+RUN pip install \
+    pydantic==2.13.4 \
+    gmsh==4.15.2 \
+    chromadb==1.5.9 \
+    sentence-transformers==5.5.1 \
+    gradio==6.14.0 \
+    scipy==1.17.1 \
+    matplotlib==3.10.9 \
+    numpy==2.4.4
+
+# ── AutoFOAM source ───────────────────────────────────────────────────────────
+WORKDIR /app/AutoFoam-Lite
+COPY . /app/AutoFoam-Lite
+RUN mkdir -p data/cases data/logs data/dataset data/checkpoints data/chroma_db data/eval
+
+# ── Pre-download model weights ────────────────────────────────────────────────
+# Set MODEL_ID at build time to bake weights into the image.
+# Comment out the RUN line to skip and download at first launch instead.
+ARG MODEL_ID=Qwen/Qwen2.5-Coder-3B-Instruct
+RUN python3.11 -c "\
+from huggingface_hub import snapshot_download; \
+snapshot_download('${MODEL_ID}', cache_dir='/data/hf_cache')"
+
+# ── Entrypoint ────────────────────────────────────────────────────────────────
+EXPOSE 7861
+COPY docker-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["ui"]

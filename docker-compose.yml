@@ -1,0 +1,54 @@
+services:
+
+  # ── GPU (default) ────────────────────────────────────────────────────────────
+  autofoam-lite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODEL_ID: Qwen/Qwen2.5-Coder-3B-Instruct   # override with 7B or fine-tuned path
+    image: autofoam-lite:latest
+    container_name: autofoam-lite
+    ports:
+      - "7861:7861"     # Gradio UI → http://localhost:7861
+    volumes:
+      - autofoam_data:/app/AutoFoam-Lite/data    # cases, dataset, checkpoints
+      - hf_cache:/data/hf_cache                  # HuggingFace model cache
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - VLLM_GPU_MEM_FRAC=0.90
+      - TORCHDYNAMO_DISABLE=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    profiles: [gpu, ""]    # default — runs with plain `docker compose up`
+
+  # ── CPU-only ─────────────────────────────────────────────────────────────────
+  autofoam-lite-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpu
+      args:
+        MODEL_ID: Qwen/Qwen2.5-Coder-3B-Instruct
+    image: autofoam-lite-cpu:latest
+    container_name: autofoam-lite-cpu
+    ports:
+      - "7861:7861"
+    volumes:
+      - autofoam_data:/app/AutoFoam-Lite/data
+      - hf_cache:/data/hf_cache
+    environment:
+      - USE_CPU_INFERENCE=1
+      - TORCHDYNAMO_DISABLE=1
+    restart: unless-stopped
+    profiles: [cpu]
+
+volumes:
+  autofoam_data:
+  hf_cache:
